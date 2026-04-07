@@ -86,15 +86,19 @@ defmodule Shared.EventStore do
               | {:error, :no_event_found}
               | {:error, any()}
       def find_event(event_id) do
+        stream_events_table = qualified_event_store_table("stream_events")
+        streams_table = qualified_event_store_table("streams")
+        events_table = qualified_event_store_table("events")
+
         with {:ok, event_uuid} <- Ecto.UUID.dump(event_id),
              {:ok, %Postgrex.Result{rows: [row]}} <-
                @repository.query(
                  """
                    select se.stream_version, e.event_id, s.stream_uuid, se.original_stream_version, e.event_type, e.correlation_id, e.causation_id, e.data, e.metadata, e.created_at
-                   from stream_events se
-                   join streams s
+                   from #{stream_events_table} se
+                   join #{streams_table} s
                      on s.stream_id = se.original_stream_id
-                   join events e
+                   join #{events_table} e
                      on se.event_id = e.event_id
                    where e.event_id = $1 and se.stream_id = 0
                  """,
@@ -147,6 +151,20 @@ defmodule Shared.EventStore do
 
       defp serializer do
         @event_store_backend |> EventStore.Config.lookup() |> Keyword.fetch!(:serializer)
+      end
+
+      defp qualified_event_store_table(table_name) when is_binary(table_name) do
+        "#{quote_identifier(event_store_schema())}.#{quote_identifier(table_name)}"
+      end
+
+      defp event_store_schema do
+        @event_store_backend |> EventStore.Config.lookup(:schema)
+      end
+
+      defp quote_identifier(identifier) when is_binary(identifier) do
+        escaped_identifier = String.replace(identifier, ~s("), ~s(""))
+
+        ~s("#{escaped_identifier}")
       end
     end
   end
