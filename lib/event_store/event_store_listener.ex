@@ -204,14 +204,16 @@ defmodule Shared.EventStoreListener do
         ack_event(event, state)
 
       {:error, reason} ->
-        Logger.error(fn ->
+        # Warning, not error: the attempt may still succeed on retry. If retries run out,
+        # the listener stops and the crash report carries the error.
+        Logger.warning(fn ->
           "#{name} failed to handle event #{inspect(event)} due to #{inspect(reason)}"
         end)
 
         handle_error({:error, reason}, current_stacktrace(), event, state, error_context)
 
       {:error, reason, stacktrace} ->
-        Logger.error(fn ->
+        Logger.warning(fn ->
           "#{name} failed to handle event #{inspect(event)} due to #{inspect(reason)}"
         end)
 
