@@ -80,6 +80,26 @@ defmodule Shared.EventStoreListenerTest do
       end)
     end
 
+    test "logs a failed attempt as a warning, not as an error" do
+      start_supervised!(ExampleConsumer)
+
+      error_logs =
+        capture_log([level: :error], fn ->
+          warning_logs =
+            capture_log([level: :warning], fn ->
+              {:ok, _events} =
+                JehovakelEx.EventStore.append_event(@event, %{test_pid: self(), raise_until: 1})
+
+              assert_receive :exception_during_event_handling
+              assert_receive :event_handled_successfully, 500
+            end)
+
+          assert warning_logs =~ "ExampleConsumer failed to handle event"
+        end)
+
+      refute error_logs =~ "failed to handle event"
+    end
+
     test "stops EventStoreListener GenServer after 3 attempts" do
       start_supervised!(ExampleConsumer)
 
